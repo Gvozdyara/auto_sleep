@@ -7,7 +7,10 @@ from winsound import Beep
 
 from observable import Variable
 
-def_td = dt.timedelta(minutes=9)
+if __file__.endswith(".py"):
+    def_td = dt.timedelta(minutes=2)
+else:
+    def_td = dt.timedelta(minutes=27)
 
 
 class TripleBeep:
@@ -32,7 +35,9 @@ def get_last_wakeup() -> dt.datetime:
     # logging.debug(f'{text=}')
     res = re.findall("Date: [\d:\-.T]+", text)
     # logging.debug(f'{res=}')
-    return dt.datetime.fromisoformat(res[0].split(" ")[-1])
+    last_wakeup = dt.datetime.fromisoformat(res[0].split(" ")[-1])
+    last_boot = get_last_boot()
+    return max((last_wakeup, last_boot))
 
 
 def get_last_boot() -> dt.datetime:
@@ -62,12 +67,7 @@ def start_count(variable):
                 logging.debug(("failed to count time left",
                                f"OK if timeOUT Or if after turn ON {last_date=}"))
                 continue
-            last_boot = get_last_boot()
-            cur_time = dt.datetime.now()
-            available_time = def_td.seconds - (cur_time - last_boot).seconds
-            if available_time <= 0:
-                logging.debug(f"{available_time=} {def_td.seconds=} {(cur_time - last_boot).seconds=} is less than 0")
-                break
+            break
 
         minutes_left = int(available_time/60)
         seconds = available_time - minutes_left * 60
@@ -87,12 +87,12 @@ def start_count(variable):
 
     time.sleep(57)
 
-
-    _last_date = get_last_wakeup()
-    if _last_date not in (last_date, last_boot):
+    available_time = def_td.seconds - (dt.datetime.now() - last_date).seconds
+    if available_time > 0:
         message = "Перезапуск программы."
         logging.debug(message)
         variable.state.value = message
+        TripleBeep()
         return
     TripleBeep()
     force_sleep()
