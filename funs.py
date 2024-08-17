@@ -13,6 +13,10 @@ else:
     def_td = dt.timedelta(minutes=27)
 
 
+class PowerChangeWarning(Exception):
+    pass
+
+
 class TripleBeep:
 
     def __init__(self):
@@ -31,6 +35,8 @@ def get_last_wakeup() -> dt.datetime:
                             stdout=subprocess.PIPE, stderr=None, shell=True)
     # text = text.stdout.decode("ANSI").replace('\r\n', ';;')
     text = text.communicate()[0].decode("ANSI").replace('\r\n', ';;')
+    if not "resumecount" in text.lower():
+        raise PowerChangeWarning()
     print(f'text of subprocess is {text}\n{type(text)=}')
     # logging.debug(f'{text=}')
     res = re.findall("Date: [\d:\-.T]+", text)
@@ -57,7 +63,11 @@ def start_count(variable):
     fail = 0
     while True:
             #  check if the pc was re awaken manually
-        last_date = get_last_wakeup()
+        try:
+            last_date = get_last_wakeup()
+        except PowerChangeWarning:
+            last_date = dt.datetime.now() - def_td
+            break
         cur_time = dt.datetime.now()
         available_time = def_td.seconds - (cur_time - last_date).seconds
         if available_time <= 0:
@@ -80,15 +90,18 @@ def start_count(variable):
         variable.state.value = (f'{message}')
 
         time.sleep(td.seconds)
-
     logging.debug("Спящий режим через 60сек")
     variable.state.value = "Спящий режим через 60сек"
     TripleBeep()
 
     time.sleep(57)
-
+    try:
+        last_date = get_last_wakeup()
+    except PowerChangeWarning:
+        last_date = dt.datetime.now() - def_td
     available_time = def_td.seconds - (dt.datetime.now() - last_date).seconds
     if available_time > 0:
+        # in case if the user manually forced sleep
         message = "Перезапуск программы."
         logging.debug(message)
         variable.state.value = message
